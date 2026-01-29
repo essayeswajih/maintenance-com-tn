@@ -25,9 +25,9 @@ export default function LoginPage() {
 
     try {
       await login(email, password)
-      router.push('/cart')
-    } catch (err) {
-      setError('Identifiants invalides. Veuillez réessayer.')
+      router.push('/') // Redirect to home on success
+    } catch (err: any) {
+      setError(err.message || 'Identifiants invalides. Veuillez réessayer.')
       console.error(err)
     } finally {
       setIsLoading(false)

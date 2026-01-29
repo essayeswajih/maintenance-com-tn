@@ -1,19 +1,24 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Menu, X, Moon, Sun, ShoppingCart, LogOut } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useClerk, useUser } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/context/auth-context'
+import { useCart } from '@/context/cart-context'
 
 export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
   const { theme, setTheme } = useTheme()
-  const { user } = useUser()
-  const { signOut } = useClerk()
-  const isAuthenticated = !!user
-  const logout = signOut
+  const { isAuthenticated, user, logout } = useAuth()
+  const { itemCount } = useCart()
+  const [mounted, setMounted] = useState(false)
+
+  // Avoid hydration mismatch for itemCount
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const toggleMenu = () => setIsOpen(!isOpen)
 
@@ -70,54 +75,43 @@ export default function Navigation() {
               aria-label="Panier"
             >
               <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -top-2 -right-2 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center font-bold">
-                3
-              </span>
+              {mounted && itemCount > 0 && (
+                <span className="absolute -top-2 -right-2 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center font-bold">
+                  {itemCount}
+                </span>
+              )}
             </Button>
           </Link>
 
           {/* Auth Section */}
-          {user ? (
+          {isAuthenticated ? (
             <div className="hidden sm:flex items-center gap-2">
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted">
-                {user.imageUrl && (
-                  <img
-                    src={user.imageUrl || "/placeholder.svg"}
-                    alt={user.firstName || 'User'}
-                    className="w-6 h-6 rounded-full"
-                  />
-                )}
-                {!user.imageUrl && (
-                  <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                    {user.firstName?.charAt(0) || 'U'}
-                  </div>
-                )}
-                <span className="text-sm font-medium hidden lg:inline">{user.firstName || 'User'}</span>
+                <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
+                  {(user?.full_name || user?.username || 'U').charAt(0)}
+                </div>
+                <span className="text-sm font-medium hidden lg:inline">{user?.full_name || user?.username || 'User'}</span>
               </div>
-              <Link href="/account" className="hidden lg:block">
-                <Button variant="ghost" size="sm" className="bg-transparent">
-                  Mon compte
-                </Button>
-              </Link>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => signOut()}
+                onClick={logout}
                 className="gap-2 bg-transparent"
                 aria-label="Logout"
               >
-                Déconnecter
+                <LogOut className="h-4 w-4" />
+                <span className="hidden lg:inline">Déconnecter</span>
               </Button>
             </div>
           ) : (
             <>
-              <Link href="/sign-in" className="hidden sm:block">
+              <Link href="/login" className="hidden sm:block">
                 <Button variant="outline" size="sm" className="bg-transparent">
                   Connexion
                 </Button>
               </Link>
 
-              <Link href="/sign-up" className="hidden sm:block">
+              <Link href="/register" className="hidden sm:block">
                 <Button size="sm">
                   S'inscrire
                 </Button>
@@ -152,7 +146,7 @@ export default function Navigation() {
                 {link.label}
               </Link>
             ))}
-            
+
             {/* Mobile Cart Link */}
             <Link
               href="/cart"
@@ -164,22 +158,13 @@ export default function Navigation() {
             </Link>
 
             <div className="flex flex-col gap-2 pt-4 border-t">
-              {user ? (
+              {isAuthenticated ? (
                 <>
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted">
-                    {user.imageUrl && (
-                      <img
-                        src={user.imageUrl || "/placeholder.svg"}
-                        alt={user.firstName || 'User'}
-                        className="w-6 h-6 rounded-full"
-                      />
-                    )}
-                    {!user.imageUrl && (
-                      <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                        {user.firstName?.charAt(0) || 'U'}
-                      </div>
-                    )}
-                    <span className="text-sm font-medium">{user.firstName || 'User'}</span>
+                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
+                      {(user?.full_name || user?.username || 'U').charAt(0)}
+                    </div>
+                    <span className="text-sm font-medium">{user?.full_name || user?.username || 'User'}</span>
                   </div>
                   <Link href="/account" className="w-full" onClick={() => setIsOpen(false)}>
                     <Button variant="outline" size="sm" className="w-full bg-transparent">
@@ -190,22 +175,23 @@ export default function Navigation() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      signOut()
+                      logout()
                       setIsOpen(false)
                     }}
-                    className="w-full bg-transparent"
+                    className="w-full bg-transparent gap-2"
                   >
+                    <LogOut className="h-4 w-4" />
                     Déconnecter
                   </Button>
                 </>
               ) : (
                 <>
-                  <Link href="/sign-in" className="w-full" onClick={() => setIsOpen(false)}>
+                  <Link href="/login" className="w-full" onClick={() => setIsOpen(false)}>
                     <Button variant="outline" size="sm" className="w-full bg-transparent">
                       Connexion
                     </Button>
                   </Link>
-                  <Link href="/sign-up" className="w-full" onClick={() => setIsOpen(false)}>
+                  <Link href="/register" className="w-full" onClick={() => setIsOpen(false)}>
                     <Button size="sm" className="w-full">
                       S'inscrire
                     </Button>

@@ -115,15 +115,14 @@ export default function Footer() {
           {footerSections.map((section, index) => (
             <div
               key={section.title}
-              className={`transition-all duration-700 ${
-                isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-              }`}
+              className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                }`}
               style={{ transitionDelay: `${(index + 1) * 100}ms` }}
             >
               <h4 className="font-semibold mb-6 text-foreground">{section.title}</h4>
               <ul className="space-y-3">
                 {section.links.map((link) => (
-                  <li key={link.href}>
+                  <li key={link.label}>
                     <Link
                       href={link.href}
                       className="text-sm text-muted-foreground hover:text-primary transition-colors relative group"

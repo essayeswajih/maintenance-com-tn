@@ -1,37 +1,35 @@
 'use client'
 
+import React from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Trash2, Plus, Minus } from 'lucide-react'
+import { Trash2, Plus, Minus, Lock } from 'lucide-react'
+import { useAuth } from '@/context/auth-context'
+import { useRouter } from 'next/navigation'
+import { useCart } from '@/context/cart-context'
 
-const CartPage = () => {
-  const cartItems = [
-    {
-      id: 1,
-      name: 'Robinetterie professionnelle',
-      price: 45.99,
-      quantity: 2,
-      image: '🚰',
-      category: 'Plomberie',
-    },
-    {
-      id: 2,
-      name: 'Tuyauterie cuivre',
-      price: 28.0,
-      quantity: 1,
-      image: '🔧',
-      category: 'Plomberie',
-    },
-  ]
+export default function CartPage() {
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+  const { cartItems, updateQuantity, removeFromCart, subtotal, shippingCost, taxRate, freeShippingThreshold } = useCart()
 
-  const subtotal = cartItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  )
-  const shipping = 12.0
-  const tax = subtotal * 0.16
+  const shipping = shippingCost
+  const tax = subtotal * taxRate
   const total = subtotal + shipping + tax
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-12 text-center">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mx-auto mb-4" />
+          <div className="h-4 bg-muted rounded w-1/2 mx-auto" />
+        </div>
+      </div>
+    )
+  }
+
 
   return (
     <>
@@ -56,34 +54,40 @@ const CartPage = () => {
                       className="p-6 flex items-center gap-6 hover:bg-muted/50 transition-colors"
                     >
                       {/* Product Image */}
-                      <div className="text-4xl flex-shrink-0">{item.image}</div>
+                      <div className="text-4xl flex-shrink-0">
+                        {item.image_url && item.image_url.length < 5 ? item.image_url : '📦'}
+                      </div>
 
                       {/* Product Info */}
                       <div className="flex-grow">
-                        <Link
-                          href={`/products/${item.category.toLowerCase()}/${item.name
-                            .toLowerCase()
-                            .replace(/\s+/g, '-')}`}
-                        >
+                        <Link href={`/products/${item.slug}`}>
                           <h3 className="font-semibold text-lg hover:text-primary transition-colors">
                             {item.name}
                           </h3>
                         </Link>
                         <p className="text-sm text-muted-foreground">
-                          {item.category}
+                          {item.category_name || item.category || 'Maintenance'}
                         </p>
                         <p className="text-lg font-bold text-primary mt-2">
-                          {item.price.toFixed(2)} DT
+                          {(item.discounted_price || item.price).toFixed(2)} DT
                         </p>
                       </div>
 
                       {/* Quantity */}
                       <div className="flex items-center gap-2 bg-muted rounded">
-                        <button className="p-2 hover:bg-background rounded">
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          className="p-2 hover:bg-background rounded"
+                          type="button"
+                        >
                           <Minus className="w-4 h-4" />
                         </button>
                         <span className="px-4">{item.quantity}</span>
-                        <button className="p-2 hover:bg-background rounded">
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="p-2 hover:bg-background rounded"
+                          type="button"
+                        >
                           <Plus className="w-4 h-4" />
                         </button>
                       </div>
@@ -92,12 +96,16 @@ const CartPage = () => {
                       <div className="text-right min-w-24">
                         <p className="text-sm text-muted-foreground">Sous-total</p>
                         <p className="font-bold">
-                          {(item.price * item.quantity).toFixed(2)} DT
+                          {((item.discounted_price || item.price) * item.quantity).toFixed(2)} DT
                         </p>
                       </div>
 
                       {/* Delete */}
-                      <button className="p-2 hover:text-destructive text-muted-foreground transition-colors">
+                      <button
+                        onClick={() => removeFromCart(item.id)}
+                        className="p-2 hover:text-destructive text-muted-foreground transition-colors"
+                        type="button"
+                      >
                         <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
@@ -126,11 +134,18 @@ const CartPage = () => {
                     <span>{subtotal.toFixed(2)} DT</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Livraison</span>
-                    <span>{shipping.toFixed(2)} DT</span>
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground">Livraison</span>
+                      {freeShippingThreshold > 0 && shipping === 0 && (
+                        <span className="text-[10px] text-green-600 font-medium">Offerte dès {freeShippingThreshold.toFixed(2)} DT</span>
+                      )}
+                    </div>
+                    <span className={shipping === 0 ? 'text-green-600 font-bold' : ''}>
+                      {shipping === 0 ? 'Gratuit' : `${shipping.toFixed(2)} DT`}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Taxe (16%)</span>
+                    <span className="text-muted-foreground">Taxe ({Math.round(taxRate * 100)}%)</span>
                     <span>{tax.toFixed(2)} DT</span>
                   </div>
                 </div>
@@ -195,5 +210,3 @@ const CartPage = () => {
     </>
   )
 }
-
-export default CartPage

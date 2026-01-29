@@ -1,53 +1,33 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DevisRequestModal } from '@/components/devis-request-modal'
-import { Droplet, Zap, Flame, Wrench, Clock, Users, Shield } from 'lucide-react'
+import { Droplet, Zap, Flame, Wrench, Clock, Users, Shield, Star } from 'lucide-react'
+import { apiFetch } from '@/lib/api'
+import { Service } from '@/lib/types'
 
 export default function ServicesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedService, setSelectedService] = useState<string>('')
-  const services = [
-    {
-      id: 1,
-      title: 'Plomberie',
-      slug: 'plumbing',
-      icon: Droplet,
-      description: 'Installation, réparation et maintenance de systèmes de plomberie.',
-      subcategories: ['Installation tuyauterie', 'Réparation fuites', 'Débouchage'],
-      image: '🚰',
-    },
-    {
-      id: 2,
-      title: 'Électricité',
-      slug: 'electrical',
-      icon: Zap,
-      description: 'Services électriques professionnels et installation certifiée.',
-      subcategories: ['Installation électrique', 'Diagnostique électrique', 'Mise aux normes'],
-      image: '⚡',
-    },
-    {
-      id: 3,
-      title: 'Chauffage',
-      slug: 'heating',
-      icon: Flame,
-      description: 'Installation et maintenance de systèmes de chauffage.',
-      subcategories: ['Installation radiateurs', 'Maintenance chaudière', 'Diagnostic thermique'],
-      image: '🔥',
-    },
-    {
-      id: 4,
-      title: 'Chaudières',
-      slug: 'boilers',
-      icon: Wrench,
-      description: 'Expertise en installation et maintenance de chaudières.',
-      subcategories: ['Installation chaudière', 'Révision annuelle', 'Ramonage'],
-      image: '🔧',
-    },
-  ]
+  const [services, setServices] = useState<Service[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    apiFetch<Service[]>('/service/')
+      .then(data => setServices(data))
+      .catch(err => console.error('Failed to fetch services:', err))
+      .finally(() => setIsLoading(false))
+  }, [])
+
+  const iconMap: Record<string, any> = {
+    'plumbing': Droplet,
+    'electrical': Zap,
+    'heating': Flame,
+    'boilers': Wrench,
+  }
 
   const features = [
     {
@@ -81,43 +61,66 @@ export default function ServicesPage() {
 
       {/* Services Grid */}
       <section className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-          {services.map((service) => {
-            const Icon = service.icon
-            return (
-              <Link key={service.id} href={`/services/${service.slug}`}>
-                <Card className="h-full p-6 hover:shadow-lg transition-shadow cursor-pointer">
-                  <div className="flex items-start justify-between mb-4">
-                    <Icon className="w-12 h-12 text-primary" />
-                    <span className="text-3xl">{service.image}</span>
-                  </div>
-                  <h3 className="font-semibold text-xl mb-2">{service.title}</h3>
-                  <p className="text-muted-foreground mb-4">{service.description}</p>
-                  <div className="mb-4">
-                    <p className="text-xs font-semibold text-muted-foreground mb-2">Nos spécialités:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {service.subcategories.map((sub) => (
-                        <span key={sub} className="text-xs bg-muted px-2 py-1 rounded">
-                          {sub}
-                        </span>
-                      ))}
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <p className="text-muted-foreground animate-pulse">Chargement des services...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+            {services.map((service) => {
+              const Icon = iconMap[service.slug] || Wrench
+              const subcategories = service.specialties ? service.specialties.split(',').map(s => s.trim()) : []
+
+              return (
+                <Link key={service.id} href={`/services/${service.slug}`}>
+                  <Card className="h-full p-6 hover:shadow-lg transition-shadow cursor-pointer">
+                    <div className="flex items-start justify-between mb-2">
+                      <Icon className="w-12 h-12 text-primary" />
+                      <span className="text-3xl">{service.image_url}</span>
                     </div>
-                  </div>
-                  <Button
-                    className="w-full"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      setSelectedService(service.title)
-                      setIsModalOpen(true)
-                    }}
-                  >
-                    Demander une intervention
-                  </Button>
-                </Card>
-              </Link>
-            )
-          })}
-        </div>
+                    <div className="flex items-center gap-1 mb-2">
+                      <div className="flex gap-0.5">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-3.5 h-3.5 ${i < Math.floor(service.rating || 0)
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-muted-foreground'
+                              }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm font-semibold ml-1">{service.rating || '0.0'}</span>
+                      <span className="text-xs text-muted-foreground">({service.num_ratings || 0} avis)</span>
+                    </div>
+                    <h3 className="font-semibold text-xl mb-2">{service.name}</h3>
+                    <p className="text-muted-foreground mb-4">{service.description}</p>
+                    <div className="mb-4">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">Nos spécialités:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {subcategories.map((sub) => (
+                          <span key={sub} className="text-xs bg-muted px-2 py-1 rounded">
+                            {sub}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setSelectedService(service.name)
+                        setIsModalOpen(true)
+                      }}
+                    >
+                      Demander une intervention
+                    </Button>
+                  </Card>
+                </Link>
+              )
+            })}
+          </div>
+        )}
       </section>
 
       {/* Features */}

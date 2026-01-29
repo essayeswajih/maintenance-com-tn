@@ -1,14 +1,14 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
-import { ClerkProvider } from '@clerk/nextjs'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
+import { AuthProvider } from '@/context/auth-context'
 import { DevisProvider } from '@/context/devis-context'
 import Navigation from '@/components/navigation'
 import Footer from '@/components/footer'
-import AuthProvider from '@/components/auth-provider' // Import AuthProvider
+import { CartProvider } from '@/context/cart-context'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     ],
     apple: '/apple-icon.png',
   },
-    generator: 'v0.app'
+  generator: 'v0.app'
 }
 
 export const viewport: Viewport = {
@@ -52,21 +52,23 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="fr" suppressHydrationWarning>
-        <body className={`font-sans antialiased`}>
+    <html lang="fr" suppressHydrationWarning>
+      <body className={`font-sans antialiased`}>
+        <AuthProvider>
           <DevisProvider>
-            <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-              <div className="flex flex-col min-h-screen bg-background text-foreground">
-                <Navigation />
-                <main className="flex-1">{children}</main>
-                <Footer />
-              </div>
-            </ThemeProvider>
+            <CartProvider>
+              <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+                <div className="flex flex-col min-h-screen bg-background text-foreground">
+                  <Navigation />
+                  <main className="flex-1">{children}</main>
+                  <Footer />
+                </div>
+              </ThemeProvider>
+            </CartProvider>
           </DevisProvider>
-          <Analytics />
-        </body>
-      </html>
-    </ClerkProvider>
+        </AuthProvider>
+        <Analytics />
+      </body>
+    </html>
   )
 }

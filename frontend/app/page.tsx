@@ -5,13 +5,30 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ArrowRight, Wrench, Zap, Droplet, Flame, ShoppingCart, FileText, Truck, Clock, Shield, Star, Calendar, User } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { Product, ServiceCategory } from '@/lib/types'
+import { apiFetch } from '@/lib/api'
 import CarouselSlider from '@/components/carousel-slider'
+import { useCart } from '@/context/cart-context'
+import { toast } from 'sonner'
 
 export default function Home() {
   const [isLoaded, setIsLoaded] = useState(false)
+  const [products, setProducts] = useState<Product[]>([])
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([])
+  const { addToCart } = useCart()
 
   useEffect(() => {
     setIsLoaded(true)
+
+    // Fetch products
+    apiFetch<Product[]>('/vetrine/products?limit=6')
+      .then(data => setProducts(data))
+      .catch(err => console.error('Failed to fetch products:', err))
+
+    // Fetch service categories
+    apiFetch<ServiceCategory[]>('/service/categories/')
+      .then(data => setServiceCategories(data))
+      .catch(err => console.error('Failed to fetch service categories:', err))
   }, [])
 
   const articles = [
@@ -77,93 +94,28 @@ export default function Home() {
     },
   ]
 
-  const services = [
-    {
-      icon: Droplet,
-      title: 'Plomberie',
-      description: 'Installation, réparation et maintenance de systèmes de plomberie.',
-      href: '/services/plumbing',
-      color: 'from-blue-500/20 to-blue-500/5',
-    },
-    {
-      icon: Zap,
-      title: 'Électricité',
-      description: 'Services électriques professionnels et installation certifiée.',
-      href: '/services/electrical',
-      color: 'from-yellow-500/20 to-yellow-500/5',
-    },
-    {
-      icon: Flame,
-      title: 'Chauffage',
-      description: 'Installation et maintenance de systèmes de chauffage.',
-      href: '/services/heating',
-      color: 'from-orange-500/20 to-orange-500/5',
-    },
-    {
-      icon: Wrench,
-      title: 'Chaudières',
-      description: 'Expertise en installation et maintenance de chaudières.',
-      href: '/services/boilers',
-      color: 'from-red-500/20 to-red-500/5',
-    },
-  ]
+  // Hardcoded mapping for icons and colors based on category names/slugs
+  const serviceStyleMap: Record<string, { icon: any, color: string }> = {
+    'plomberie': { icon: Droplet, color: 'from-blue-500/20 to-blue-500/5' },
+    'plumbing': { icon: Droplet, color: 'from-blue-500/20 to-blue-500/5' },
+    'electricite': { icon: Zap, color: 'from-yellow-500/20 to-yellow-500/5' },
+    'electrical': { icon: Zap, color: 'from-yellow-500/20 to-yellow-500/5' },
+    'chauffage': { icon: Flame, color: 'from-orange-500/20 to-orange-500/5' },
+    'heating': { icon: Flame, color: 'from-orange-500/20 to-orange-500/5' },
+    'chaudieres': { icon: Wrench, color: 'from-red-500/20 to-red-500/5' },
+    'boilers': { icon: Wrench, color: 'from-red-500/20 to-red-500/5' },
+  }
 
-  const products = [
-    {
-      id: 1,
-      name: 'Radiateur Aluminium Premium',
-      category: 'Chauffage',
-      price: 149.99,
-      rating: 4.8,
-      reviews: 128,
-      image: '🔥',
-    },
-    {
-      id: 2,
-      name: 'Tuyauterie Cuivre 22mm',
-      category: 'Plomberie',
-      price: 89.50,
-      rating: 4.9,
-      reviews: 95,
-      image: '🧊',
-    },
-    {
-      id: 3,
-      name: 'Câble Électrique 2.5mm²',
-      category: 'Électricité',
-      price: 59.99,
-      rating: 4.7,
-      reviews: 156,
-      image: '⚡',
-    },
-    {
-      id: 4,
-      name: 'Thermostat Intelligent WiFi',
-      category: 'Chauffage',
-      price: 199.99,
-      rating: 4.9,
-      reviews: 203,
-      image: '📱',
-    },
-    {
-      id: 5,
-      name: 'Robinet Thermostatique',
-      category: 'Plomberie',
-      price: 79.99,
-      rating: 4.6,
-      reviews: 87,
-      image: '💧',
-    },
-    {
-      id: 6,
-      name: 'Disjoncteur Différentiel',
-      category: 'Électricité',
-      price: 45.00,
-      rating: 4.8,
-      reviews: 142,
-      image: '🔌',
-    },
-  ]
+  const displayServices = serviceCategories.map(cat => {
+    const style = serviceStyleMap[cat.slug.toLowerCase()] || serviceStyleMap[cat.name.toLowerCase()] || { icon: Wrench, color: 'from-primary/20 to-primary/5' }
+    return {
+      ...cat,
+      icon: style.icon,
+      color: style.color,
+      href: `/services/${cat.slug}`,
+    }
+  })
+
 
   const features = [
     {
@@ -209,11 +161,11 @@ export default function Home() {
                 Professionnelles
               </h1>
             </div>
-            
+
             <p className={`text-lg md:text-xl text-muted-foreground mb-8 text-balance transition-all duration-700 delay-100 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
               Vente de produits premium et services spécialisés en plomberie, électricité, chauffage et installation de chaudières
             </p>
-            
+
             <div className={`flex gap-4 justify-center flex-wrap transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
               <Link href="/products">
                 <Button size="lg" className="gap-2 shadow-lg hover:shadow-xl transition-shadow">
@@ -246,45 +198,56 @@ export default function Home() {
             {products.map((product, index) => (
               <div
                 key={product.id}
-                className={`transition-all duration-700 ${
-                  isLoaded
-                    ? 'opacity-100 translate-y-0'
-                    : 'opacity-0 translate-y-8'
-                }`}
+                className={`transition-all duration-700 ${isLoaded
+                  ? 'opacity-100 translate-y-0'
+                  : 'opacity-0 translate-y-8'
+                  }`}
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
-                <Card className="h-full p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer group overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  
-                  <div className="relative z-10">
-                    <div className="text-6xl mb-4 group-hover:animate-float">{product.image}</div>
-                    
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
-                        <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-                          {product.category}
-                        </span>
+                <Link href={`/products/${product.slug}`}>
+                  <Card className="h-full p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer group overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                    <div className="relative z-10">
+                      <div className="text-6xl mb-4 group-hover:animate-float h-24 flex items-center justify-center">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} className="max-h-full object-contain" />
+                        ) : (
+                          '📦'
+                        )}
+                      </div>
+
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h3 className="font-semibold text-lg mb-1 line-clamp-1">{product.name}</h3>
+                          <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
+                            {product.category_id ? 'Produit' : 'Maintenance'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="flex items-center gap-1">
+                          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                          <span className="font-semibold text-sm">{product.rating || 5.0}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">({product.num_ratings || 0} avis)</span>
+                      </div>
+
+                      <div className="border-t pt-4">
+                        <p className="text-2xl font-bold mb-4">{product.price.toFixed(2)} TND</p>
+                        <Button className="w-full gap-2 group/btn" size="sm" onClick={(e) => {
+                          e.preventDefault()
+                          addToCart(product)
+                          toast.success(`${product.name} ajouté au panier`)
+                        }}>
+                          <ShoppingCart className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
+                          Ajouter au panier
+                        </Button>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="font-semibold text-sm">{product.rating}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">({product.reviews} avis)</span>
-                    </div>
-
-                    <div className="border-t pt-4">
-                      <p className="text-2xl font-bold mb-4">{product.price.toFixed(2)} TND</p>
-                      <Button className="w-full gap-2 group/btn" size="sm">
-                        <ShoppingCart className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
-                        Ajouter au panier
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
+                  </Card>
+                </Link>
               </div>
             ))}
           </div>
@@ -312,7 +275,7 @@ export default function Home() {
 
           <CarouselSlider
             itemsPerView={3}
-            items={services.map((service) => {
+            items={displayServices.map((service) => {
               const Icon = service.icon
               return (
                 <Link key={service.href} href={service.href}>
@@ -320,7 +283,7 @@ export default function Home() {
                     <div className="mb-6 inline-flex p-3 rounded-lg bg-white/10 backdrop-blur">
                       <Icon className="w-8 h-8 text-primary" />
                     </div>
-                    <h3 className="font-semibold text-lg mb-3">{service.title}</h3>
+                    <h3 className="font-semibold text-lg mb-3">{service.name}</h3>
                     <p className="text-sm text-muted-foreground">{service.description}</p>
                     <div className="mt-6 flex items-center text-primary font-semibold text-sm group hover:gap-2 transition-all">
                       En savoir plus
@@ -420,11 +383,10 @@ export default function Home() {
               return (
                 <div
                   key={feature.title}
-                  className={`text-center group transition-all duration-700 ${
-                    isLoaded
-                      ? 'opacity-100 translate-y-0'
-                      : 'opacity-0 translate-y-8'
-                  }`}
+                  className={`text-center group transition-all duration-700 ${isLoaded
+                    ? 'opacity-100 translate-y-0'
+                    : 'opacity-0 translate-y-8'
+                    }`}
                   style={{ transitionDelay: `${index * 100}ms` }}
                 >
                   <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
@@ -454,7 +416,7 @@ export default function Home() {
               Rejoignez des milliers de clients satisfaits et découvrez la différence d'un service professionnel
             </p>
           </div>
-          
+
           <div className={`flex gap-4 justify-center flex-wrap transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             <Link href="/products">
               <Button variant="secondary" size="lg" className="gap-2">

@@ -1,32 +1,51 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-const isAdminRoute = createRouteMatcher(["/admin(.*)"])
-const isProtectedRoute = createRouteMatcher([
-  "/cart(.*)",
-  "/account(.*)",
-  "/checkout(.*)",
-])
+// Routes that require authentication
+const authRoutes = ['/account', '/checkout']
+// Routes that require admin role
+const adminRoutes = ['/admin']
 
-export default clerkMiddleware(async (auth, req) => {
-  // Protect admin routes - require authentication and admin role
-  if (isAdminRoute(req)) {
-    await auth.protect()
-    // Check for admin role (you'll need to set this in Clerk organization roles)
-    const { userId, sessionClaims } = await auth()
-    if (!userId) {
-      return new Response("Unauthorized", { status: 401 })
+export function middleware(request: NextRequest) {
+    const { pathname } = request.nextUrl
+    const token = request.cookies.get('access_token')?.value
+    const role = request.cookies.get('user_role')?.value
+
+    const isAuthRoute = authRoutes.some(route => pathname.startsWith(route))
+    const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route))
+
+    // 1. If trying to access admin routes
+    if (isAdminRoute) {
+        if (!token || role !== 'admin') {
+            return NextResponse.redirect(new URL('/login', request.url))
+        }
     }
-  }
 
-  // Protect user routes - require authentication
-  if (isProtectedRoute(req)) {
-    await auth.protect()
-  }
-})
+    // 2. If trying to access general authenticated routes
+    if (isAuthRoute) {
+        if (!token) {
+            const url = new URL('/login', request.url)
+            url.searchParams.set('callbackUrl', pathname)
+            return NextResponse.redirect(url)
+        }
+    }
 
+    // 3. Prevent logged-in users from visiting login/register pages
+    if ((pathname === '/login' || pathname === '/register') && token) {
+        return NextResponse.redirect(new URL('/account', request.url))
+    }
+
+    return NextResponse.next()
+}
+
+// Config to match routes
 export const config = {
-  matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|cur|heic|heif|mp4)(?:$|[?#])|[^?]*\\.(?:json)(\\?|$)).*)",
-    "/",
-  ],
+    matcher: [
+        '/admin/:path*',
+        '/account/:path*',
+        '/checkout/:path*',
+        '/checkout/:path*',
+        '/login',
+        '/register',
+    ],
 }

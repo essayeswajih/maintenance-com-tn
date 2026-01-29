@@ -1,27 +1,47 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Plus, Edit, Trash2, Search } from 'lucide-react'
+import { apiFetch } from '@/lib/api'
+import { Service } from '@/lib/types'
 
 export default function AdminServicesPage() {
-  const [services, setServices] = useState([
-    { id: 1, name: 'Plomberie', description: 'Installation et réparation de plomberie', status: 'Actif', requests: 45 },
-    { id: 2, name: 'Électricité', description: 'Services électriques professionnels', status: 'Actif', requests: 38 },
-    { id: 3, name: 'Chauffage', description: 'Installation et maintenance de chauffage', status: 'Actif', requests: 52 },
-    { id: 4, name: 'Chaudières', description: 'Installation et maintenance de chaudières', status: 'Actif', requests: 21 },
-  ])
-
+  const [services, setServices] = useState<Service[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const data = await apiFetch<Service[]>('/service/')
+        setServices(data || [])
+      } catch (err) {
+        console.error('Failed to fetch admin services:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchServices()
+  }, [])
+
   const filteredServices = services.filter(s =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleDelete = (id: number) => {
-    if (window.confirm('Êtes-vous sûr?')) {
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce service?')) return
+
+    try {
+      await apiFetch(`/service/${id}`, {
+        method: 'DELETE'
+      })
       setServices(services.filter(s => s.id !== id))
+    } catch (err) {
+      console.error('Failed to delete service:', err)
+      alert('Erreur lors de la suppression')
     }
   }
 
@@ -46,60 +66,65 @@ export default function AdminServicesPage() {
             placeholder="Chercher un service..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full pl-10 pr-4 py-2 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
       </div>
 
-      {/* Services Table */}
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted">
-              <tr>
-                <th className="text-left p-4 font-semibold">Service</th>
-                <th className="text-left p-4 font-semibold">Description</th>
-                <th className="text-left p-4 font-semibold">Demandes</th>
-                <th className="text-left p-4 font-semibold">Statut</th>
-                <th className="text-left p-4 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredServices.map((service) => (
-                <tr key={service.id} className="border-b hover:bg-muted/50">
-                  <td className="p-4 font-medium">{service.name}</td>
-                  <td className="p-4 text-sm text-muted-foreground">{service.description}</td>
-                  <td className="p-4">
-                    <span className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-semibold">
-                      {service.requests}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">
-                      {service.status}
-                    </span>
-                  </td>
-                  <td className="p-4 flex gap-2">
-                    <Link href={`/admin/services/${service.id}/edit`}>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700"
-                      onClick={() => handleDelete(service.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {isLoading ? (
+        <div className="flex justify-center py-10">
+          <p className="text-muted-foreground animate-pulse">Chargement des services...</p>
         </div>
-      </Card>
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="text-left p-4 font-semibold">Service</th>
+                  <th className="text-left p-4 font-semibold">Description</th>
+                  <th className="text-left p-4 font-semibold">Note</th>
+                  <th className="text-left p-4 font-semibold">Statut</th>
+                  <th className="text-left p-4 font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredServices.map((service) => (
+                  <tr key={service.id} className="border-b hover:bg-muted/50">
+                    <td className="p-4 font-medium">{service.name}</td>
+                    <td className="p-4 text-sm text-muted-foreground line-clamp-1 truncate max-w-xs">{service.description}</td>
+                    <td className="p-4">
+                      <span className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-semibold">
+                        {service.rating} ({service.num_ratings})
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <span className="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">
+                        Actif
+                      </span>
+                    </td>
+                    <td className="p-4 flex gap-2">
+                      <Link href={`/admin/services/${service.id}/edit`}>
+                        <Button variant="ghost" size="sm" className="bg-transparent text-foreground">
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="bg-transparent text-red-600 hover:text-red-700"
+                        onClick={() => handleDelete(service.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

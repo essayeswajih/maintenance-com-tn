@@ -6,9 +6,17 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ArrowLeft, Lock, Eye, EyeOff, Shield, Smartphone, LogOut, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Lock, Eye, EyeOff, Shield, Smartphone, LogOut, AlertCircle, Loader2 } from 'lucide-react'
+import { useAuth } from '@/context/auth-context'
+import { apiFetch } from '@/lib/api'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+import { useEffect } from "react"
 
 export default function SecurityPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth()
+  const router = useRouter()
+
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -22,7 +30,20 @@ export default function SecurityPage() {
   })
 
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [isToggling2FA, setIsToggling2FA] = useState(false)
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+  }, [isAuthenticated, authLoading, router])
+
+  useEffect(() => {
+    if (user) {
+      setTwoFactorEnabled(!!user.two_factor_enabled)
+    }
+  }, [user])
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -32,11 +53,46 @@ export default function SecurityPage() {
     }))
   }
 
-  const handleChangePassword = () => {
-    if (passwords.new === passwords.confirm && passwords.new.length >= 8) {
-      setShowSuccessMessage(true)
+  const handleChangePassword = async () => {
+    if (passwords.new !== passwords.confirm) {
+      toast.error('Les mots de passe ne correspondent pas')
+      return
+    }
+    if (passwords.new.length < 8) {
+      toast.error('Le mot de passe doit faire au moins 8 caractères')
+      return
+    }
+
+    setIsChangingPassword(true)
+    try {
+      await apiFetch('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          current_password: passwords.current,
+          new_password: passwords.new
+        })
+      })
+      toast.success('Votre mot de passe a été modifié avec succès.')
       setPasswords({ current: '', new: '', confirm: '' })
-      setTimeout(() => setShowSuccessMessage(false), 3000)
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la modification du mot de passe')
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
+  const handleToggle2FA = async () => {
+    setIsToggling2FA(true)
+    try {
+      const response = await apiFetch<{ two_factor_enabled: boolean }>('/auth/toggle-2fa', {
+        method: 'POST'
+      })
+      setTwoFactorEnabled(response.two_factor_enabled)
+      toast.success(response.two_factor_enabled ? '2FA activé' : '2FA désactivé')
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la mise à jour de la 2FA')
+    } finally {
+      setIsToggling2FA(false)
     }
   }
 
@@ -61,15 +117,7 @@ export default function SecurityPage() {
         </div>
       </section>
 
-      {/* Success Message */}
-      {showSuccessMessage && (
-        <section className="container mx-auto px-4 pt-6">
-          <div className="p-4 bg-green-100 border border-green-200 text-green-800 rounded-lg flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            Votre mot de passe a été modifié avec succès.
-          </div>
-        </section>
-      )}
+      {/* Success Message - Removed as we use toast */}
 
       <section className="container mx-auto px-4 py-12">
         <div className="max-w-2xl space-y-6">
@@ -163,9 +211,8 @@ export default function SecurityPage() {
               {passwords.new && (
                 <div>
                   <div className="flex items-center gap-2 text-sm mb-2">
-                    <div className={`h-2 flex-1 rounded-full ${
-                      passwords.new.length >= 8 ? 'bg-green-500' : 'bg-red-500'
-                    }`} />
+                    <div className={`h-2 flex-1 rounded-full ${passwords.new.length >= 8 ? 'bg-green-500' : 'bg-red-500'
+                      }`} />
                     <span className={passwords.new.length >= 8 ? 'text-green-600' : 'text-red-600'}>
                       {passwords.new.length >= 8 ? 'Mot de passe fort' : 'Mot de passe faible'}
                     </span>
@@ -182,10 +229,17 @@ export default function SecurityPage() {
 
               <Button
                 onClick={handleChangePassword}
-                disabled={!passwords.current || !passwords.new || passwords.new !== passwords.confirm}
+                disabled={!passwords.current || !passwords.new || passwords.new !== passwords.confirm || isChangingPassword}
                 className="w-full mt-6"
               >
-                Changer le mot de passe
+                {isChangingPassword ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Modification...
+                  </>
+                ) : (
+                  'Changer le mot de passe'
+                )}
               </Button>
             </div>
           </Card>
@@ -199,9 +253,14 @@ export default function SecurityPage() {
               </div>
               <Button
                 variant={twoFactorEnabled ? 'outline' : 'default'}
-                onClick={() => setTwoFactorEnabled(!twoFactorEnabled)}
+                onClick={handleToggle2FA}
+                disabled={isToggling2FA}
               >
-                {twoFactorEnabled ? 'Désactiver' : 'Activer'}
+                {isToggling2FA ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  twoFactorEnabled ? 'Désactiver' : 'Activer'
+                )}
               </Button>
             </div>
 

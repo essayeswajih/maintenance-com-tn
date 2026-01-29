@@ -1,68 +1,40 @@
+'use client'
+
+import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Search, Filter } from 'lucide-react'
+import { Product, ServiceCategory } from '@/lib/types'
+import { apiFetch } from '@/lib/api'
+import { useCart } from '@/context/cart-context'
+import { toast } from 'sonner'
 
-export default function ProductsPage() {
-  const categories = [
-    { name: 'Plomberie', slug: 'plumbing', count: 45 },
-    { name: 'Électricité', slug: 'electrical', count: 38 },
-    { name: 'Chauffage', slug: 'heating', count: 32 },
-    { name: 'Chaudières', slug: 'boilers', count: 18 },
-    { name: 'Outils', slug: 'tools', count: 67 },
-    { name: 'Pièces détachées', slug: 'parts', count: 120 },
-  ]
+export default function ProductsPage({ searchParams: searchParamsPromise }: { searchParams: Promise<{ category?: string }> }) {
+  const searchParams = use(searchParamsPromise)
+  const { category: categoryName } = searchParams
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const { addToCart } = useCart()
 
-  const products = [
-    {
-      id: 1,
-      name: 'Robinetterie professionnelle',
-      category: 'Plomberie',
-      price: '45.99',
-      slug: 'robinetterie-pro',
-      image: '🚰',
-    },
-    {
-      id: 2,
-      name: 'Câble électrique 2.5mm²',
-      category: 'Électricité',
-      price: '12.50',
-      slug: 'cable-electricite',
-      image: '⚡',
-    },
-    {
-      id: 3,
-      name: 'Tuyauterie cuivre',
-      category: 'Plomberie',
-      price: '28.00',
-      slug: 'tuyauterie-cuivre',
-      image: '🔧',
-    },
-    {
-      id: 4,
-      name: 'Thermostat numérique',
-      category: 'Chauffage',
-      price: '89.99',
-      slug: 'thermostat-digital',
-      image: '🌡️',
-    },
-    {
-      id: 5,
-      name: 'Radiateur aluminium',
-      category: 'Chauffage',
-      price: '120.00',
-      slug: 'radiateur-alu',
-      image: '🔥',
-    },
-    {
-      id: 6,
-      name: 'Disjoncteur 16A',
-      category: 'Électricité',
-      price: '8.99',
-      slug: 'disjoncteur-16a',
-      image: '⚙️',
-    },
-  ]
+  useEffect(() => {
+    setIsLoading(true)
+    // Fetch products (with optional category filter)
+    const productsUrl = categoryName
+      ? `/vetrine/products?category=${encodeURIComponent(categoryName)}`
+      : '/vetrine/products'
+
+    apiFetch<Product[]>(productsUrl)
+      .then(data => setProducts(data))
+      .catch(err => console.error('Failed to fetch products:', err))
+      .finally(() => setIsLoading(false))
+
+    // Fetch categories (using vetrine categories)
+    apiFetch<any[]>('/vetrine/categories')
+      .then(data => setCategories(data))
+      .catch(err => console.error('Failed to fetch categories:', err))
+  }, [categoryName])
 
   return (
     <>
@@ -100,18 +72,29 @@ export default function ProductsPage() {
                 Catégories
               </h3>
               <div className="space-y-2">
-                {categories.map((category) => (
-                  <Link
-                    key={category.slug}
-                    href={`/products/${category.slug}`}
-                    className="block p-2 rounded hover:bg-muted transition-colors"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{category.name}</span>
-                      <span className="text-xs text-muted-foreground">({category.count})</span>
-                    </div>
-                  </Link>
-                ))}
+                <Link
+                  href="/products"
+                  className={`block p-2 rounded hover:bg-muted transition-colors ${!categoryName ? 'bg-muted text-primary font-semibold' : ''}`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Tous les produits</span>
+                  </div>
+                </Link>
+                {categories.map((category) => {
+                  const slug = category.name.toLowerCase().replace(/ /g, '-')
+                  return (
+                    <Link
+                      key={category.id}
+                      href={`/products/category/${slug}`}
+                      className={`block p-2 rounded hover:bg-muted transition-colors ${categoryName === category.name ? 'bg-muted text-primary font-semibold' : ''}`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">{category.name}</span>
+                        <span className="text-xs text-muted-foreground">Explorer</span>
+                      </div>
+                    </Link>
+                  )
+                })}
               </div>
             </div>
 
@@ -132,23 +115,41 @@ export default function ProductsPage() {
           {/* Products Grid */}
           <div className="lg:col-span-3">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {products.map((product) => (
-                <Link key={product.id} href={`/products/${product.slug}`}>
-                  <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-                    <div className="aspect-square bg-gradient-to-br from-primary/5 to-accent/5 flex items-center justify-center text-5xl">
-                      {product.image}
-                    </div>
-                    <div className="p-4">
-                      <p className="text-xs text-muted-foreground mb-1">{product.category}</p>
-                      <h3 className="font-semibold mb-2 line-clamp-2">{product.name}</h3>
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-primary">{product.price} DT</span>
-                        <Button size="sm">Ajouter</Button>
+              {products.length > 0 ? (
+                products.map((product) => (
+                  <Link key={product.id} href={`/products/${product.slug}`}>
+                    <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
+                      <div className="aspect-square bg-gradient-to-br from-primary/5 to-accent/5 flex items-center justify-center text-5xl">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          '📦'
+                        )}
                       </div>
-                    </div>
-                  </Card>
-                </Link>
-              ))}
+                      <div className="p-4">
+                        <p className="text-xs text-muted-foreground mb-1">Produit</p>
+                        <h3 className="font-semibold mb-2 line-clamp-2 h-12">{product.name}</h3>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-primary">{product.price.toFixed(2)} DT</span>
+                          <Button size="sm" onClick={(e) => {
+                            e.preventDefault();
+                            addToCart(product);
+                            toast.success(`${product.name} ajouté au panier`);
+                          }}>Ajouter</Button>
+                        </div>
+                      </div>
+                    </Card>
+                  </Link>
+                ))
+              ) : (
+                <div className="col-span-full py-20 text-center">
+                  {isLoading ? (
+                    <p className="text-muted-foreground">Chargement des produits...</p>
+                  ) : (
+                    <p className="text-muted-foreground">Aucun produit trouvé.</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Pagination */}

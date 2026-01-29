@@ -1,28 +1,59 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Plus, Edit, Trash2, Search } from 'lucide-react'
+import { apiFetch } from '@/lib/api'
+import { Product, Category } from '@/lib/types'
 
 export default function AdminProductsPage() {
-  const [products, setProducts] = useState([
-    { id: 1, name: 'Radiateur Aluminium Premium', category: 'Chauffage', price: 149.99, stock: 45, status: 'Actif' },
-    { id: 2, name: 'Tuyauterie Cuivre 22mm', category: 'Plomberie', price: 89.50, stock: 120, status: 'Actif' },
-    { id: 3, name: 'Câble Électrique 2.5mm²', category: 'Électricité', price: 59.99, stock: 0, status: 'Rupture' },
-    { id: 4, name: 'Thermostat Intelligent WiFi', category: 'Chauffage', price: 199.99, stock: 32, status: 'Actif' },
-    { id: 5, name: 'Robinet Thermostatique', category: 'Plomberie', price: 79.99, stock: 67, status: 'Actif' },
-  ])
-
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Record<number, string>>({})
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [productsData, categoriesData] = await Promise.all([
+          apiFetch<Product[]>('/vetrine/products?limit=100'),
+          apiFetch<any[]>('/vetrine/categories')
+        ])
+
+        setProducts(productsData || [])
+
+        // Map category IDs to names
+        const catMap: Record<number, string> = {}
+        categoriesData.forEach((cat: any) => {
+          catMap[cat.id] = cat.name
+        })
+        setCategories(catMap)
+      } catch (err) {
+        console.error('Failed to fetch admin products:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleDelete = (id: number) => {
-    if (window.confirm('Êtes-vous sûr?')) {
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce produit?')) return
+
+    try {
+      await apiFetch(`/vetrine/products/${id}`, {
+        method: 'DELETE'
+      })
       setProducts(products.filter(p => p.id !== id))
+    } catch (err) {
+      console.error('Failed to delete product:', err)
+      alert('Erreur lors de la suppression')
     }
   }
 
@@ -47,66 +78,73 @@ export default function AdminProductsPage() {
             placeholder="Chercher un produit..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full pl-10 pr-4 py-2 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
       </div>
 
-      {/* Products Table */}
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted">
-              <tr>
-                <th className="text-left p-4 font-semibold">Produit</th>
-                <th className="text-left p-4 font-semibold">Catégorie</th>
-                <th className="text-left p-4 font-semibold">Prix</th>
-                <th className="text-left p-4 font-semibold">Stock</th>
-                <th className="text-left p-4 font-semibold">Statut</th>
-                <th className="text-left p-4 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="border-b hover:bg-muted/50">
-                  <td className="p-4 font-medium">{product.name}</td>
-                  <td className="p-4">{product.category}</td>
-                  <td className="p-4 font-semibold">{product.price.toFixed(2)} DT</td>
-                  <td className="p-4">
-                    <span className={product.stock > 0 ? 'text-green-600' : 'text-red-600'}>
-                      {product.stock} unités
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                      product.status === 'Actif'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {product.status}
-                    </span>
-                  </td>
-                  <td className="p-4 flex gap-2">
-                    <Link href={`/admin/products/${product.id}/edit`}>
-                      <Button variant="ghost" size="sm" className="gap-2">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700"
-                      onClick={() => handleDelete(product.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {isLoading ? (
+        <div className="flex justify-center py-10">
+          <p className="text-muted-foreground animate-pulse">Chargement des produits...</p>
         </div>
-      </Card>
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="text-left p-4 font-semibold">Produit</th>
+                  <th className="text-left p-4 font-semibold">Catégorie</th>
+                  <th className="text-left p-4 font-semibold">Prix</th>
+                  <th className="text-left p-4 font-semibold">Stock</th>
+                  <th className="text-left p-4 font-semibold">Statut</th>
+                  <th className="text-left p-4 font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.map((product) => {
+                  const status = product.stock_quantity > 0 ? 'Actif' : 'Rupture'
+                  return (
+                    <tr key={product.id} className="border-b hover:bg-muted/50">
+                      <td className="p-4 font-medium">{product.name}</td>
+                      <td className="p-4">{categories[product.category_id] || 'N/A'}</td>
+                      <td className="p-4 font-semibold">{product.price.toFixed(2)} DT</td>
+                      <td className="p-4">
+                        <span className={product.stock_quantity > 0 ? 'text-green-600' : 'text-red-600'}>
+                          {product.stock_quantity} unités
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${status === 'Actif'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                          }`}>
+                          {status}
+                        </span>
+                      </td>
+                      <td className="p-4 flex gap-2">
+                        <Link href={`/admin/products/${product.id}/edit`}>
+                          <Button variant="ghost" size="sm" className="gap-2 bg-transparent text-foreground">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="bg-transparent text-red-600 hover:text-red-700"
+                          onClick={() => handleDelete(product.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

@@ -1,9 +1,50 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Mail, Lock, User } from 'lucide-react'
+import { useAuth } from '@/context/auth-context'
+import { useRouter } from 'next/navigation'
 
 export default function RegisterPage() {
+  const { register } = useAuth()
+  const router = useRouter()
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+  })
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Les mots de passe ne correspondent pas.')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      await register(formData.fullName, formData.email, formData.phone, formData.password)
+      router.push('/')
+    } catch (err: any) {
+      setError(err.message || "Erreur lors de l'inscription")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12">
       <div className="w-full max-w-md">
@@ -15,7 +56,13 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          <form className="space-y-6">
+          {error && (
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6">
             {/* Full Name */}
             <div>
               <label className="block text-sm font-medium mb-2">Nom complet</label>
@@ -23,7 +70,10 @@ export default function RegisterPage() {
                 <User className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
                 <input
                   type="text"
+                  name="fullName"
                   placeholder="Votre nom"
+                  value={formData.fullName}
+                  onChange={handleChange}
                   required
                   className="w-full pl-10 pr-4 py-2 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -37,7 +87,10 @@ export default function RegisterPage() {
                 <Mail className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
                 <input
                   type="email"
+                  name="email"
                   placeholder="votre@email.com"
+                  value={formData.email}
+                  onChange={handleChange}
                   required
                   className="w-full pl-10 pr-4 py-2 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -49,7 +102,10 @@ export default function RegisterPage() {
               <label className="block text-sm font-medium mb-2">Téléphone</label>
               <input
                 type="tel"
+                name="phone"
                 placeholder="+216 XX XXX XXX"
+                value={formData.phone}
+                onChange={handleChange}
                 required
                 className="w-full px-4 py-2 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
               />
@@ -62,7 +118,10 @@ export default function RegisterPage() {
                 <Lock className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
                 <input
                   type="password"
+                  name="password"
                   placeholder="••••••••"
+                  value={formData.password}
+                  onChange={handleChange}
                   required
                   className="w-full pl-10 pr-4 py-2 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -79,7 +138,10 @@ export default function RegisterPage() {
                 <Lock className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
                 <input
                   type="password"
+                  name="confirmPassword"
                   placeholder="••••••••"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
                   required
                   className="w-full pl-10 pr-4 py-2 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -102,8 +164,8 @@ export default function RegisterPage() {
             </label>
 
             {/* Submit Button */}
-            <Button type="submit" className="w-full">
-              Créer un compte
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Création du compte...' : 'Créer un compte'}
             </Button>
           </form>
 

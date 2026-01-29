@@ -12,139 +12,132 @@ import {
   MapPin,
   Phone,
   Star,
+  Droplet,
+  Zap,
+  Flame,
   Wrench,
   AlertCircle,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, use } from 'react'
+import { apiFetch } from '@/lib/api'
+import { Service, Rating } from '@/lib/types'
+import { useAuth } from '@/context/auth-context'
+import { useRouter } from 'next/navigation'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { toast } from 'sonner'
 
-export default function ServicePage({ params }: { params: { slug: string } }) {
-  const [selectedDate, setSelectedDate] = useState('')
-  const [activeTab, setActiveTab] = useState('overview')
+export default function ServicePage({ params: paramsPromise }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(paramsPromise)
+  const [service, setService] = useState<Service | null>(null)
+  const [allServices, setAllServices] = useState<Service[]>([])
+  const [reviews, setReviews] = useState<Rating[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('reviews')
 
-  // Map slug to service data
-  const serviceData: Record<
-    string,
-    {
-      title: string
-      description: string
-      icon: string
-      rating: number
-      reviews: number
-      price: number
-      priceUnit: string
-      duration: string
-      availability: string
-    }
-  > = {
-    plumbing: {
-      title: 'Service de Plomberie',
-      description:
-        'Services complèts de plomberie incluant installation, réparation et maintenance de systèmes de plomberie résidentiels et commerciaux.',
-      icon: '💧',
-      rating: 4.9,
-      reviews: 234,
-      price: 150,
-      priceUnit: 'intervention',
-      duration: '2-3 heures',
-      availability: 'Lun-Dim 7h-20h',
-    },
-    electrical: {
-      title: 'Service Électricité',
-      description:
-        'Services électriques professionnels incluant installation, réparation et mise aux normes de sécurité de votre installation électrique.',
-      icon: '⚡',
-      rating: 4.8,
-      reviews: 189,
-      price: 120,
-      priceUnit: 'intervention',
-      duration: '1-2 heures',
-      availability: 'Lun-Sam 8h-19h',
-    },
-    heating: {
-      title: 'Service Chauffage',
-      description:
-        'Installation et maintenance de systèmes de chauffage modernes pour assurer votre confort thermique toute l\'année.',
-      icon: '🔥',
-      rating: 4.9,
-      reviews: 167,
-      price: 200,
-      priceUnit: 'intervention',
-      duration: '3-4 heures',
-      availability: 'Lun-Dim 7h-20h',
-    },
-    boilers: {
-      title: 'Service Installation Chaudières',
-      description:
-        'Expertise complète en installation, maintenance et dépannage de chaudières haute performance et économes en énergie.',
-      icon: '🔧',
-      rating: 4.9,
-      reviews: 145,
-      price: 300,
-      priceUnit: 'intervention',
-      duration: '4-6 heures',
-      availability: 'Lun-Sam 8h-18h',
-    },
+  // Review form state
+  const { user, isAuthenticated } = useAuth()
+  const router = useRouter()
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
+  const [newRating, setNewRating] = useState(5)
+  const [newComment, setNewComment] = useState('')
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+
+  useEffect(() => {
+    setIsLoading(true)
+    apiFetch<Service>(`/service/slug/${slug}`)
+      .then(serviceData => {
+        setService(serviceData)
+        return Promise.all([
+          apiFetch<Service[]>('/service/'),
+          apiFetch<Rating[]>(`/rating/service/${serviceData.id}`)
+        ])
+      })
+      .then(([listData, reviewsData]) => {
+        setAllServices(listData)
+        setReviews(reviewsData)
+      })
+      .catch(err => console.error('Failed to fetch service data:', err))
+      .finally(() => setIsLoading(false))
+  }, [slug])
+
+  const iconMap: Record<string, any> = {
+    'plumbing': Droplet,
+    'electrical': Zap,
+    'heating': Flame,
+    'boilers': Wrench,
   }
 
-  const service = serviceData[params.slug] || serviceData.plumbing
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground animate-pulse text-lg">Chargement du service...</p>
+      </div>
+    )
+  }
 
-  const features = [
-    'Techniciens certifiés et expérimentés',
-    'Travaux garantis 2 ans minimum',
-    'Devis gratuit sans engagement',
-    'Intervention rapide (24-48h)',
-    'Respect des normes de sécurité',
-    'Transparence tarifaire totale',
-  ]
+  if (!service) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <h1 className="text-2xl font-bold text-destructive">Service non trouvé</h1>
+        <Link href="/services">
+          <Button variant="outline">Retour aux services</Button>
+        </Link>
+      </div>
+    )
+  }
 
-  const process = [
-    {
-      step: 1,
-      title: 'Demande de devis',
-      description: 'Remplissez le formulaire avec les détails de votre projet',
-    },
-    {
-      step: 2,
-      title: 'Évaluation',
-      description: 'Nos experts évaluent votre demande et proposent un devis',
-    },
-    {
-      step: 3,
-      title: 'Planification',
-      description: 'Choisissez une date et heure qui vous convient',
-    },
-    {
-      step: 4,
-      title: 'Intervention',
-      description: 'Notre technicien effectue le travail avec profesionnalisme',
-    },
-    {
-      step: 5,
-      title: 'Suivi',
-      description: 'Nous assurons le suivi post-intervention et la satisfaction',
-    },
-  ]
+  const handleAddReviewClick = () => {
+    if (!isAuthenticated) {
+      router.push('/login')
+      return
+    }
+    setIsReviewModalOpen(true)
+  }
 
-  const reviews = [
-    {
-      author: 'Mohamed Ben',
-      rating: 5,
-      date: 'Il y a 2 semaines',
-      text: 'Travail de très bonne qualité. Technicien très professionnel et courtois. Je recommande vivement!',
-    },
-    {
-      author: 'Amira S.',
-      rating: 5,
-      date: 'Il y a 1 mois',
-      text: 'Service rapide et efficace. Le devis était conforme au prix final. Excellent rapport qualité-prix.',
-    },
-    {
-      author: 'Karim Saïdi',
-      rating: 4,
-      date: 'Il y a 6 semaines',
-      text: 'Très satisfait du service. Quelques améliorations possibles sur la communication, mais résultat excellent.',
-    },
-  ]
+  const handleSubmitReview = async () => {
+    if (!newComment.trim()) {
+      toast.error('Veuillez laisser un commentaire')
+      return
+    }
+
+    setIsSubmittingReview(true)
+    try {
+      await apiFetch('/rating/', {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: user?.id,
+          service_id: service?.id,
+          rating: newRating,
+          comment: newComment
+        })
+      })
+
+      toast.success('Merci pour votre avis !')
+      setIsReviewModalOpen(false)
+      setNewComment('')
+      setNewRating(5)
+
+      // Refresh reviews
+      if (service) {
+        const updatedReviews = await apiFetch<Rating[]>(`/rating/service/${service.id}`)
+        setReviews(updatedReviews)
+      }
+    } catch (error) {
+      console.error('Failed to submit review:', error)
+      toast.error('Erreur lors de l\'envoi de l\'avis')
+    } finally {
+      setIsSubmittingReview(false)
+    }
+  }
+
+  const Icon = iconMap[service.slug] || Wrench
 
   return (
     <>
@@ -157,24 +150,23 @@ export default function ServicePage({ params }: { params: { slug: string } }) {
           </Link>
           <div className="flex items-start justify-between">
             <div>
-              <div className="text-6xl mb-4">{service.icon}</div>
-              <h1 className="text-3xl font-bold mb-2">{service.title}</h1>
+              <div className="text-6xl mb-4">{service.image_url}</div>
+              <h1 className="text-3xl font-bold mb-2">{service.name}</h1>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1">
                   <div className="flex gap-0.5">
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-4 h-4 ${
-                          i < Math.floor(service.rating)
-                            ? 'fill-yellow-400 text-yellow-400'
-                            : 'text-muted-foreground'
-                        }`}
+                        className={`w-4 h-4 ${i < Math.floor(service.rating || 0)
+                          ? 'fill-yellow-400 text-yellow-400'
+                          : 'text-muted-foreground'
+                          }`}
                       />
                     ))}
                   </div>
-                  <span className="font-semibold">{service.rating}</span>
-                  <span className="text-muted-foreground">({service.reviews} avis)</span>
+                  <span className="font-semibold">{service.rating || '0.0'}</span>
+                  <span className="text-muted-foreground">({service.num_ratings || 0} avis)</span>
                 </div>
               </div>
             </div>
@@ -193,15 +185,15 @@ export default function ServicePage({ params }: { params: { slug: string } }) {
                 <Card className="p-4 text-center border-0 bg-muted/50">
                   <Clock className="w-6 h-6 text-primary mx-auto mb-2" />
                   <p className="text-sm font-semibold mb-1">Durée moyenne</p>
-                  <p className="text-xs text-muted-foreground">{service.duration}</p>
+                  <p className="text-xs text-muted-foreground">{service.moyDuration} heures</p>
                 </Card>
                 <Card className="p-4 text-center border-0 bg-muted/50">
                   <MapPin className="w-6 h-6 text-primary mx-auto mb-2" />
                   <p className="text-sm font-semibold mb-1">Disponibilité</p>
-                  <p className="text-xs text-muted-foreground">{service.availability}</p>
+                  <p className="text-xs text-muted-foreground">{service.disponiblity}</p>
                 </Card>
                 <Card className="p-4 text-center border-0 bg-muted/50">
-                  <Wrench className="w-6 h-6 text-primary mx-auto mb-2" />
+                  <Icon className="w-6 h-6 text-primary mx-auto mb-2" />
                   <p className="text-sm font-semibold mb-1">Tarif de base</p>
                   <p className="text-xs text-muted-foreground">{service.price} TND</p>
                 </Card>
@@ -213,19 +205,18 @@ export default function ServicePage({ params }: { params: { slug: string } }) {
               {/* Tabs */}
               <div className="mb-8">
                 <div className="flex gap-8 border-b mb-8">
-                  {['overview', 'process', 'reviews'].map((tab) => (
+                  {['reviews', 'overview', 'process'].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`pb-4 font-semibold transition-colors ${
-                        activeTab === tab
-                          ? 'border-b-2 border-primary text-primary'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                      className={`pb-4 font-semibold transition-colors ${activeTab === tab
+                        ? 'border-b-2 border-primary text-primary'
+                        : 'text-muted-foreground hover:text-foreground'
+                        }`}
                     >
+                      {tab === 'reviews' && 'Avis clients'}
                       {tab === 'overview' && 'Aperçu'}
                       {tab === 'process' && 'Processus'}
-                      {tab === 'reviews' && 'Avis clients'}
                     </button>
                   ))}
                 </div>
@@ -235,7 +226,7 @@ export default function ServicePage({ params }: { params: { slug: string } }) {
                   <div>
                     <h3 className="text-xl font-semibold mb-6">Pourquoi choisir ce service?</h3>
                     <ul className="space-y-4">
-                      {features.map((feature, i) => (
+                      {service.features?.map((feature, i) => (
                         <li key={i} className="flex items-start gap-3">
                           <CheckCircle className="w-6 h-6 text-primary flex-shrink-0 mt-0.5" />
                           <span className="text-muted-foreground">{feature}</span>
@@ -250,13 +241,13 @@ export default function ServicePage({ params }: { params: { slug: string } }) {
                   <div>
                     <h3 className="text-xl font-semibold mb-8">Notre processus</h3>
                     <div className="space-y-6">
-                      {process.map((item) => (
+                      {service.process?.map((item) => (
                         <div key={item.step} className="flex gap-4">
                           <div className="flex flex-col items-center">
                             <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg flex-shrink-0">
                               {item.step}
                             </div>
-                            {item.step < process.length && (
+                            {item.step < service.process!.length && (
                               <div className="w-1 h-12 bg-primary/20 mt-2" />
                             )}
                           </div>
@@ -273,31 +264,46 @@ export default function ServicePage({ params }: { params: { slug: string } }) {
                 {/* Reviews Tab */}
                 {activeTab === 'reviews' && (
                   <div>
-                    <h3 className="text-xl font-semibold mb-8">Avis clients</h3>
+                    <div className="flex items-center justify-between mb-8">
+                      <h3 className="text-xl font-semibold">Avis clients</h3>
+                      <Button onClick={handleAddReviewClick} size="sm" variant="outline" className="gap-2">
+                        <Star className="w-4 h-4" />
+                        Laisser un avis
+                      </Button>
+                    </div>
                     <div className="space-y-6">
-                      {reviews.map((review, i) => (
-                        <Card key={i} className="p-6 border-0 bg-muted/50">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <p className="font-semibold">{review.author}</p>
-                              <div className="flex gap-1 mt-1">
-                                {[...Array(5)].map((_, j) => (
-                                  <Star
-                                    key={j}
-                                    className={`w-4 h-4 ${
-                                      j < review.rating
+                      {reviews.length > 0 ? (
+                        reviews.map((review, i) => (
+                          <Card key={i} className="p-6 border-0 bg-muted/50">
+                            <div className="flex items-start justify-between mb-3">
+                              <div>
+                                <p className="font-semibold">{review.user?.full_name || 'Client'}</p>
+                                <div className="flex gap-1 mt-1">
+                                  {[...Array(5)].map((_, j) => (
+                                    <Star
+                                      key={j}
+                                      className={`w-4 h-4 ${j < review.rating
                                         ? 'fill-yellow-400 text-yellow-400'
                                         : 'text-muted-foreground'
-                                    }`}
-                                  />
-                                ))}
+                                        }`}
+                                    />
+                                  ))}
+                                </div>
                               </div>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(review.created_at).toLocaleDateString('fr-FR', {
+                                  day: 'numeric',
+                                  month: 'long',
+                                  year: 'numeric'
+                                })}
+                              </span>
                             </div>
-                            <span className="text-xs text-muted-foreground">{review.date}</span>
-                          </div>
-                          <p className="text-muted-foreground">{review.text}</p>
-                        </Card>
-                      ))}
+                            <p className="text-muted-foreground">{review.comment}</p>
+                          </Card>
+                        ))
+                      ) : (
+                        <p className="text-muted-foreground italic">Aucun avis pour le moment.</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -311,7 +317,7 @@ export default function ServicePage({ params }: { params: { slug: string } }) {
                 <div className="mb-8">
                   <p className="text-sm text-muted-foreground mb-2">À partir de</p>
                   <p className="text-3xl font-bold text-primary mb-1">{service.price} TND</p>
-                  <p className="text-xs text-muted-foreground">par {service.priceUnit}</p>
+                  <p className="text-xs text-muted-foreground">par {service.price_unit}</p>
                   <p className="text-xs text-muted-foreground mt-4 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-primary" />
                     Le prix final peut varier selon votre demande spécifique
@@ -364,17 +370,17 @@ export default function ServicePage({ params }: { params: { slug: string } }) {
           <div className="mt-16">
             <h3 className="text-2xl font-bold mb-8">Autres services</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {Object.entries(serviceData)
-                .filter(([slug]) => slug !== params.slug)
-                .map(([slug, svc]) => (
-                  <Link key={slug} href={`/services/${slug}`}>
+              {allServices
+                .filter((s) => s.slug !== slug)
+                .map((svc) => (
+                  <Link key={svc.id} href={`/services/${svc.slug}`}>
                     <Card className="p-6 hover:shadow-lg transition-all hover:-translate-y-2 cursor-pointer h-full flex flex-col">
-                      <div className="text-6xl mb-4">{svc.icon}</div>
-                      <h4 className="font-semibold mb-2 flex-1">{svc.title}</h4>
+                      <div className="text-6xl mb-4">{svc.image_url}</div>
+                      <h4 className="font-semibold mb-2 flex-1">{svc.name}</h4>
                       <div className="flex items-center gap-1 text-sm">
                         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="font-semibold">{svc.rating}</span>
-                        <span className="text-muted-foreground">({svc.reviews})</span>
+                        <span className="font-semibold">{svc.rating || '0.0'}</span>
+                        <span className="text-muted-foreground">({svc.num_ratings || 0})</span>
                       </div>
                     </Card>
                   </Link>
@@ -383,6 +389,61 @@ export default function ServicePage({ params }: { params: { slug: string } }) {
           </div>
         </div>
       </section>
+
+      {/* Review Modal */}
+      <Dialog open={isReviewModalOpen} onOpenChange={setIsReviewModalOpen}>
+        <DialogContent className="sm:max-width-[425px]">
+          <DialogHeader>
+            <DialogTitle>Laisser un avis pour {service.name}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Votre note</label>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setNewRating(star)}
+                    className="focus:outline-none"
+                    type="button"
+                  >
+                    <Star
+                      className={`w-8 h-8 ${star <= newRating
+                        ? 'fill-yellow-400 text-yellow-400'
+                        : 'text-muted-foreground'
+                        } transition-colors hover:scale-110`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Votre commentaire</label>
+              <Textarea
+                placeholder="Racontez-nous votre expérience..."
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsReviewModalOpen(false)}
+              disabled={isSubmittingReview}
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleSubmitReview}
+              disabled={isSubmittingReview}
+            >
+              {isSubmittingReview ? 'Envoi...' : 'Publier l\'avis'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
