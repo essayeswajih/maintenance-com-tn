@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     formData.append('username', email) // Using email as username in this system
     formData.append('password', password)
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8005'}/auth/token`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://ween-maintenance.tn'}/auth/token`, {
       method: 'POST',
       body: formData,
       credentials: 'include',

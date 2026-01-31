@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8005'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ween-maintenance.tn'
 
 export async function apiFetch<T>(
     endpoint: string,
